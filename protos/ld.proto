@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+option go_package = "./ld;ld";
+
 service UsedLanguages {
     rpc Breakdown(BreakdownRequest) returns (BreakdownResponse);
 }
@@ -9,10 +11,10 @@ message BreakdownRequest {
 }
 
 message BreakdownResponse {
-    repeated Files breakdown = 1;
+    repeated Language breakdown = 1;
 }
 
-message Files {
-    string language = 1;
+message Language {
+    string name = 1;
     repeated string files = 2;
 }
