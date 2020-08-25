@@ -2,7 +2,7 @@ package service
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/json"
 	"os"
 	"os/exec"
 
@@ -19,11 +19,11 @@ func NewBreakdown(l hclog.Logger) *Breakdown {
 }
 
 func (b *Breakdown) GetLanguages(projectID string) ([]*ld.Language, error) {
-	executeLinguist("portapps")
-	return []*ld.Language{}, nil
+
+	return executeLinguist("portapps"), nil
 }
 
-func executeLinguist(repo string) {
+func executeLinguist(repo string) []*ld.Language {
 	cmd := exec.Command("github-linguist", "/opt/data/"+repo, "--json")
 	cmdOutput := &bytes.Buffer{}
 	cmd.Stdout = cmdOutput
@@ -31,5 +31,24 @@ func executeLinguist(repo string) {
 	if err != nil {
 		os.Stderr.WriteString(err.Error())
 	}
-	fmt.Print(string(cmdOutput.Bytes()))
+	output := string(cmdOutput.Bytes())
+
+	var result map[string][]interface{}
+	json.Unmarshal([]byte(output), &result)
+
+	languages := []*ld.Language{}
+	for key, value := range result {
+		language := &ld.Language{
+			Name: key,
+		}
+
+		files := []string{}
+		for _, fp := range value {
+			files = append(files, fp.(string))
+		}
+		language.Files = files
+		languages = append(languages, language)
+	}
+
+	return languages
 }
