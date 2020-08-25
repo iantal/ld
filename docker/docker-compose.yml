@@ -1,0 +1,18 @@
+version: '3.8'
+
+services: 
+    ld:
+        container_name: ld
+        build:
+            context: ../
+            dockerfile: docker/Dockerfile
+        volumes:
+            - ../repos:/opt/data
+        ports: 
+            - 8003:8003
+        networks: 
+            - app_net
+
+networks:
+    app_net:
+        driver: bridge

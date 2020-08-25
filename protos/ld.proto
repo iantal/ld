@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+service UsedLanguages {
+    rpc Breakdown(BreakdownRequest) returns (BreakdownResponse);
+}
+
+message BreakdownRequest {
+    string projectID = 1;
+}
+
+message BreakdownResponse {
+    repeated Files breakdown = 1;
+}
+
+message Files {
+    string language = 1;
+    repeated string files = 2;
+}

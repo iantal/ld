@@ -1,0 +1,89 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/signal"
+	"time"
+
+	gohandlers "github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/hashicorp/go-hclog"
+	"github.com/nicholasjackson/env"
+	"github.com/spf13/viper"
+)
+
+var (
+	bindAddress = env.String("BIND_ADDRESS", false, ":8003", "Bind address for the server")
+	logLevel    = env.String("LOG_LEVEL", false, "debug", "Log output level for the server [debug, info, trace]")
+	basePath    = env.String("BASE_PATH", false, "./repos", "Base path to save uploads")
+)
+
+func main() {
+	viper.AutomaticEnv()
+	env.Parse()
+
+	l := hclog.New(
+		&hclog.LoggerOptions{
+			Name:  "ld",
+			Level: hclog.LevelFromString(*logLevel),
+		},
+	)
+
+	// create a logger for the server from the default logger
+	sl := l.StandardLogger(&hclog.StandardLoggerOptions{InferLevels: true})
+
+	// create a new serve mux and register the handlers
+	sm := mux.NewRouter()
+
+	ch := gohandlers.CORS(gohandlers.AllowedOrigins([]string{"*"}))
+
+	// upload files
+	ph := sm.Methods(http.MethodPost).Subrouter()
+	ph.HandleFunc("/api/v1/languages", handle)
+
+	// create a new server
+	s := http.Server{
+		Addr:         *bindAddress,      // configure the bind address
+		Handler:      ch(sm),            // set the default handler
+		ErrorLog:     sl,                // the logger for the server
+		ReadTimeout:  5 * time.Second,   // max time to read request from the client
+		WriteTimeout: 10 * time.Second,  // max time to write response to the client
+		IdleTimeout:  120 * time.Second, // max time for connections using TCP Keep-Alive
+	}
+
+	// start the server
+	go func() {
+		l.Info("Starting server", "bind_address", *bindAddress)
+
+		err := s.ListenAndServe()
+		if err != nil {
+			l.Error("Unable to start server", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// trap sigterm or interupt and gracefully shutdown the server
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Kill)
+
+	// Block until a signal is received.
+	sig := <-c
+	l.Info("Shutting down server with", "signal", sig)
+
+	// gracefully shutdown the server, waiting max 30 seconds for current operations to complete
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	s.Shutdown(ctx)
+}
+
+func handle(rw http.ResponseWriter, r *http.Request) {
+	output, err := exec.Command("github-linguist", "/opt/data/portapps").CombinedOutput()
+	if err != nil {
+		os.Stderr.WriteString(err.Error())
+	}
+	fmt.Println(string(output))
+}
