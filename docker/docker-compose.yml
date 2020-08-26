@@ -8,6 +8,7 @@ services:
             dockerfile: docker/Dockerfile
         environment: 
             BASE_PATH: "/opt/data"
+            RK_HOST: "rk:8002"
         volumes:
             - ../repos:/opt/data
         ports: 
