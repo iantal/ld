@@ -5,26 +5,28 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/iantal/ld/protos/ld"
 )
 
 type Breakdown struct {
-	log hclog.Logger
+	log      hclog.Logger
+	basePath string
 }
 
-func NewBreakdown(l hclog.Logger) *Breakdown {
-	return &Breakdown{l}
+func NewBreakdown(l hclog.Logger, basePath string) *Breakdown {
+	return &Breakdown{l, basePath}
 }
 
 func (b *Breakdown) GetLanguages(projectID string) ([]*ld.Language, error) {
-
-	return executeLinguist("portapps"), nil
+	return b.executeLinguist("portapps"), nil
 }
 
-func executeLinguist(repo string) []*ld.Language {
-	cmd := exec.Command("github-linguist", "/opt/data/"+repo, "--json")
+func (b *Breakdown) executeLinguist(repo string) []*ld.Language {
+	repoPath := filepath.Join(b.basePath, repo)
+	cmd := exec.Command("github-linguist", repoPath, "--json")
 	cmdOutput := &bytes.Buffer{}
 	cmd.Stdout = cmdOutput
 	err := cmd.Run()

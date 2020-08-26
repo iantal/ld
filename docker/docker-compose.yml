@@ -6,6 +6,8 @@ services:
         build:
             context: ../
             dockerfile: docker/Dockerfile
+        environment: 
+            BASE_PATH: "/opt/data"
         volumes:
             - ../repos:/opt/data
         ports: 

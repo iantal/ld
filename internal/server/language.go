@@ -13,8 +13,8 @@ type Linguist struct {
 	breakdown *service.Breakdown
 }
 
-func NewLinguist(l hclog.Logger) *Linguist {
-	return &Linguist{l, service.NewBreakdown(l)}
+func NewLinguist(l hclog.Logger, basePath string) *Linguist {
+	return &Linguist{l, service.NewBreakdown(l, basePath)}
 }
 
 func (l *Linguist) Breakdown(ctx context.Context, rr *protos.BreakdownRequest) (*protos.BreakdownResponse, error) {

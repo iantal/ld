@@ -8,24 +8,20 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/iantal/ld/internal/server"
 	protos "github.com/iantal/ld/protos/ld"
-	"github.com/nicholasjackson/env"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-var (
-	logLevel = env.String("LOG_LEVEL", false, "debug", "Log output level for the server [debug, info, trace]")
-	basePath = env.String("BASE_PATH", false, "./repos", "Base path to save uploads")
-)
-
 func main() {
+	viper.AutomaticEnv()
 	log := hclog.Default()
 
 	// create a new gRPC server, use WithInsecure to allow http connections
 	gs := grpc.NewServer()
 
 	// create an instance of the Currency server
-	c := server.NewLinguist(log)
+	c := server.NewLinguist(log, fmt.Sprintf("%v", viper.Get("BASE_PATH")))
 
 	// register the currency server
 	protos.RegisterUsedLanguagesServer(gs, c)
