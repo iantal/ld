@@ -36,6 +36,8 @@ RUN apk --update --no-cache add \
     cmake \
     icu-dev \
     ruby-dev \
+    unzip \
+    zip \
   && gem install --no-document github-linguist -v ${VERSION} \
   && apk del build-dependencies \
   && rm -rf /var/cache/apk/*

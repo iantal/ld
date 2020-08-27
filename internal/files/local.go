@@ -1,10 +1,12 @@
 package files
 
 import (
-	"archive/zip"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
 
 	"golang.org/x/xerrors"
 )
@@ -91,40 +93,29 @@ func (l *Local) FullPath(path string) string {
 	return filepath.Join(l.basePath, path)
 }
 
+// Unzip uses the unzip command line tool to extract the project to the specified target directory
 func (l *Local) Unzip(archive, target, name string) error {
-	reader, err := zip.OpenReader(archive)
-	if err != nil {
-		return xerrors.Errorf("Unable to open zip file: %w", err)
-	}
-
 	td := filepath.Join(target, name)
 	if err := os.MkdirAll(td, 0755); err != nil {
 		return xerrors.Errorf("Unable to create target directory: %w", err)
 	}
 
-	for _, file := range reader.File {
-		path := filepath.Join(target, file.Name)
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, file.Mode())
-		} else {
-			fileReader, err := file.Open()
-			if err != nil {
-				return xerrors.Errorf("Unable to open file: %w", err)
-			}
-			defer fileReader.Close()
+	cmd := exec.Command("unzip", archive, "-d", td)
 
-			// create a new file at the path
-			targetFile, err := os.Create(path)
-			if err != nil {
-				return xerrors.Errorf("Unable to create file: %w", err)
-			}
-			defer targetFile.Close()
-
-			if _, err := io.Copy(targetFile, fileReader); err != nil {
-				return xerrors.Errorf("Unable to write target file: %w", err)
-			}
+	var waitStatus syscall.WaitStatus
+	if err := cmd.Run(); err != nil {
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
 		}
+		if exitError, ok := err.(*exec.ExitError); ok {
+			waitStatus = exitError.Sys().(syscall.WaitStatus)
+			fmt.Printf("Output: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
+		}
+		return err
 	}
+
+	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
+	fmt.Printf("Output: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
 
 	return nil
 }
