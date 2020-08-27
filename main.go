@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/iantal/ld/internal/files"
 	"github.com/iantal/ld/internal/server"
 	protos "github.com/iantal/ld/protos/ld"
 	"github.com/spf13/viper"
@@ -20,8 +21,16 @@ func main() {
 	// create a new gRPC server, use WithInsecure to allow http connections
 	gs := grpc.NewServer()
 
-	// create an instance of the Currency server
-	c := server.NewLinguist(log, fmt.Sprintf("%v", viper.Get("BASE_PATH")))
+	bp := fmt.Sprintf("%v", viper.Get("BASE_PATH"))
+	rkHost := fmt.Sprintf("%v", viper.Get("RK_HOST"))
+
+	stor, err := files.NewLocal(bp, 1024*1000*1000*5)
+	if err != nil {
+		log.Error("Unable to create storage", "error", err)
+		os.Exit(1)
+	}
+
+	c := server.NewLinguist(log, bp, rkHost, stor)
 
 	// register the currency server
 	protos.RegisterUsedLanguagesServer(gs, c)
