@@ -115,7 +115,6 @@ func (l *Local) Unzip(archive, target, name string) error {
 	}
 
 	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-	fmt.Printf("Output: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
 
 	return nil
 }

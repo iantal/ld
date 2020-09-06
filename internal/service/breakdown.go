@@ -35,10 +35,13 @@ func (b *Breakdown) GetLanguages(projectID string) ([]*ld.Language, error) {
 		return []*ld.Language{}, nil
 	}
 
-	err = b.downloadRepository(project)
-	if err != nil {
-		b.log.Error("Could not download zip from rk for project", "projectID", projectID, "err", err)
-		return []*ld.Language{}, nil
+	projectPath := filepath.Join(b.store.FullPath(projectID), "zip")
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		err = b.downloadRepository(project)
+		if err != nil {
+			b.log.Error("Could not download zip from rk for project", "projectID", projectID, "err", err)
+			return []*ld.Language{}, nil
+		}
 	}
 
 	return b.executeLinguist(filepath.Join(projectID, "unzip", project.Name)), nil
@@ -69,9 +72,8 @@ func (b *Breakdown) getProjectName(projectID string) (*data.Project, error) {
 }
 
 func (b *Breakdown) downloadRepository(project *data.Project) error {
-	b.log.Info("Project", "p", project)
 	projectID := project.ProjectID.String()
-	resp, err := http.DefaultClient.Get("http://" + b.rkHost + "/api/v1/projects/" + projectID + "/download")
+	resp, err := http.DefaultClient.Get("http://" + b.rkHost + "/api/v1/projects/" + projectID + "/download/git")
 	if err != nil {
 		return err
 	}
@@ -107,8 +109,8 @@ func (b *Breakdown) save(id, projectName string, r io.ReadCloser) {
 }
 
 func (b *Breakdown) executeLinguist(repo string) []*ld.Language {
+	b.log.Info("Executing linguist for project", "project", repo)
 	repoPath := filepath.Join(b.basePath, repo)
-	b.log.Info("Base path", "repo", repoPath)
 	cmd := exec.Command("github-linguist", repoPath, "--json")
 	cmdOutput := &bytes.Buffer{}
 	cmd.Stdout = cmdOutput
