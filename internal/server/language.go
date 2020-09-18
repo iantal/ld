@@ -14,14 +14,14 @@ type Linguist struct {
 	breakdown *service.Breakdown
 }
 
-func NewLinguist(l hclog.Logger, basePath, rkHost string, store files.Storage) *Linguist {
-	return &Linguist{l, service.NewBreakdown(l, basePath, rkHost, store)}
+func NewLinguist(l hclog.Logger, basePath, rmHost string, store files.Storage) *Linguist {
+	return &Linguist{l, service.NewBreakdown(l, basePath, rmHost, store)}
 }
 
 func (l *Linguist) Breakdown(ctx context.Context, rr *protos.BreakdownRequest) (*protos.BreakdownResponse, error) {
-	l.log.Info("Handle request for Breakdown", "projectID", rr.GetProjectID())
+	l.log.Info("Handle request for Breakdown", "projectID", rr.GetProjectID(), "commit", rr.GetCommitHash())
 
-	breakdownResult, err := l.breakdown.GetLanguages(rr.GetProjectID())
+	breakdownResult, err := l.breakdown.GetLanguages(rr.GetProjectID(), rr.GetCommitHash())
 	if err != nil {
 		return nil, err
 	}

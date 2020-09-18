@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/iantal/ld/internal/data"
 	"github.com/iantal/ld/internal/files"
 	"github.com/iantal/ld/protos/ld"
 )
@@ -20,60 +18,43 @@ import (
 type Breakdown struct {
 	log      hclog.Logger
 	basePath string
-	rkHost   string
+	rmHost   string
 	store    files.Storage
 }
 
-func NewBreakdown(l hclog.Logger, basePath, rkHost string, store files.Storage) *Breakdown {
-	return &Breakdown{l, basePath, rkHost, store}
+func NewBreakdown(l hclog.Logger, basePath, rmHost string, store files.Storage) *Breakdown {
+	return &Breakdown{l, basePath, rmHost, store}
 }
 
-func (b *Breakdown) GetLanguages(projectID string) ([]*ld.Language, error) {
-	project, err := b.getProjectName(projectID)
-	if err != nil {
-		b.log.Error("Could not get project name", "projectID", projectID, "err", err)
-		return []*ld.Language{}, nil
-	}
+func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, error) {
 
-	projectPath := filepath.Join(b.store.FullPath(projectID), "zip")
+	projectPath := filepath.Join(b.store.FullPath(projectID), "bundle")
+
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		err = b.downloadRepository(project)
+		err := b.downloadRepository(projectID, commit)
 		if err != nil {
-			b.log.Error("Could not download zip from rk for project", "projectID", projectID, "err", err)
-			return []*ld.Language{}, nil
+			b.log.Error("Could not download bundled repository", "projectID", projectID, "commit", commit, "err", err)
+			return []*ld.Language{}, fmt.Errorf("Could not download bundled repository for %s", projectID)
 		}
 	}
 
-	return b.executeLinguist(filepath.Join(projectID, "unzip", project.Name)), nil
+	bp := projectID + ".bundle"
+	srcPath := b.store.FullPath(filepath.Join(projectID, "bundle", bp))
+	destPath := b.store.FullPath(filepath.Join(projectID, "unbundle"))
+
+	if _, err := os.Stat(destPath); os.IsNotExist(err) {
+		err := b.store.Unbundle(srcPath, destPath)
+		if err != nil {
+			b.log.Error("Could not unbundle repository", "projectID", projectID, "commit", commit, "err", err)
+			return []*ld.Language{}, fmt.Errorf("Could not unbundle repository for %s", projectID)
+		}
+	}
+
+	return b.executeLinguist(filepath.Join(destPath, projectID)), nil
 }
 
-func (b *Breakdown) getProjectName(projectID string) (*data.Project, error) {
-	resp, err := http.DefaultClient.Get("http://" + b.rkHost + "/api/v1/projects/" + projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	project := &data.Project{}
-	err = json.Unmarshal(body, project)
-	if err != nil {
-		return nil, err
-	}
-	return project, nil
-}
-
-func (b *Breakdown) downloadRepository(project *data.Project) error {
-	projectID := project.ProjectID.String()
-	resp, err := http.DefaultClient.Get("http://" + b.rkHost + "/api/v1/projects/" + projectID + "/download/git")
+func (b *Breakdown) downloadRepository(projectID, commit string) error {
+	resp, err := http.DefaultClient.Get("http://" + b.rmHost + "/api/v1/projects/" + projectID + "/" + commit + "/download")
 	if err != nil {
 		return err
 	}
@@ -82,36 +63,32 @@ func (b *Breakdown) downloadRepository(project *data.Project) error {
 		return fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
 	}
 
-	b.save(projectID, project.Name, resp.Body)
+	b.log.Info("Content-Dispozition", "file", resp.Header.Get("Content-Disposition"))
+
+	b.save(projectID, resp.Body)
 	resp.Body.Close()
 
 	return nil
 }
 
-func (b *Breakdown) save(id, projectName string, r io.ReadCloser) {
-	b.log.Info("Save project - storage", "id", id)
+func (b *Breakdown) save(projectID string, r io.ReadCloser) error {
+	b.log.Info("Save project - storage", "projectID", projectID)
 
-	unzippedPath := filepath.Join(id, "unzip")
-
-	zp := id + ".zip"
-	fp := filepath.Join(id, "zip", zp)
+	bp := projectID + ".bundle"
+	fp := filepath.Join(projectID, "bundle", bp)
 	err := b.store.Save(fp, r)
 
 	if err != nil {
 		b.log.Error("Unable to save file", "error", err)
-	} else {
-		b.log.Info("Unzipping", "id", id, "path", unzippedPath)
-		err := b.store.Unzip(b.store.FullPath(fp), b.store.FullPath(unzippedPath), projectName)
-		if err != nil {
-			b.log.Error("Unable to unzip file", "error", err)
-		}
+		return fmt.Errorf("Unable to save file %s", err)
 	}
+
+	return nil
 }
 
 func (b *Breakdown) executeLinguist(repo string) []*ld.Language {
 	b.log.Info("Executing linguist for project", "project", repo)
-	repoPath := filepath.Join(b.basePath, repo)
-	cmd := exec.Command("github-linguist", repoPath, "--json")
+	cmd := exec.Command("github-linguist", repo, "--json")
 	cmdOutput := &bytes.Buffer{}
 	cmd.Stdout = cmdOutput
 	err := cmd.Run()

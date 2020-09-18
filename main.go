@@ -22,7 +22,7 @@ func main() {
 	gs := grpc.NewServer()
 
 	bp := fmt.Sprintf("%v", viper.Get("BASE_PATH"))
-	rkHost := fmt.Sprintf("%v", viper.Get("RK_HOST"))
+	rmHost := fmt.Sprintf("%v", viper.Get("RM_HOST"))
 
 	stor, err := files.NewLocal(bp, 1024*1000*1000*5)
 	if err != nil {
@@ -30,7 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	c := server.NewLinguist(log, bp, rkHost, stor)
+	c := server.NewLinguist(log, bp, rmHost, stor)
 
 	// register the currency server
 	protos.RegisterUsedLanguagesServer(gs, c)

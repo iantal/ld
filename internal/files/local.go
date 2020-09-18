@@ -93,15 +93,18 @@ func (l *Local) FullPath(path string) string {
 	return filepath.Join(l.basePath, path)
 }
 
-// Unzip uses the unzip command line tool to extract the project to the specified target directory
-func (l *Local) Unzip(archive, target, name string) error {
-	td := filepath.Join(target, name)
-	if err := os.MkdirAll(td, 0755); err != nil {
+// Unbundle is cloning a bundle to the dest directory
+func (l *Local) Unbundle(src, dest string) error {
+	if err := os.MkdirAll(dest, 0755); err != nil {
 		return xerrors.Errorf("Unable to create target directory: %w", err)
 	}
 
-	cmd := exec.Command("unzip", archive, "-d", td)
+	os.Chdir(dest)
 
+	fmt.Println(dest)
+	fmt.Println(src)
+
+	cmd := exec.Command("git", "clone", src)
 	var waitStatus syscall.WaitStatus
 	if err := cmd.Run(); err != nil {
 		if err != nil {
@@ -115,6 +118,6 @@ func (l *Local) Unzip(archive, target, name string) error {
 	}
 
 	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-
+	os.Chdir("-")
 	return nil
 }

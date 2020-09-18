@@ -8,14 +8,13 @@ services:
             dockerfile: docker/Dockerfile
         environment: 
             BASE_PATH: "/opt/data"
-            RK_HOST: "rk:8002"
+            RM_HOST: "rm:8005"
         volumes:
             - ../repos:/opt/data
         ports: 
             - 8003:8003
-        networks: 
-            - app_net
 
 networks:
-    app_net:
-        driver: bridge
+    default:
+        external:
+            name: proxynet
