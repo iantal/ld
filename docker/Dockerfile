@@ -38,6 +38,7 @@ RUN apk --update --no-cache add \
     ruby-dev \
     unzip \
     zip \
+  && apk add git \
   && gem install --no-document github-linguist -v ${VERSION} \
   && apk del build-dependencies \
   && rm -rf /var/cache/apk/*
@@ -45,5 +46,6 @@ RUN apk --update --no-cache add \
 
 ENV BASE_PATH="/opt/data"
 VOLUME [ "/opt/data" ]
+RUN git config --global user.email "test@rm.com" && git config --global user.name "testrm"
 EXPOSE 8003
 CMD ["./main"]
