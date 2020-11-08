@@ -3,7 +3,9 @@ version: '3.8'
 services: 
     ld:
         container_name: ld
-        image: micky0000/seclens:v1.0.0-ld
+        build:
+            context: ../
+            dockerfile: docker/Dockerfile
         environment: 
             BASE_PATH: "/opt/data"
             RM_HOST: "rm:8005"
