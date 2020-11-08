@@ -10,19 +10,20 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/iantal/ld/internal/files"
+	"github.com/iantal/ld/internal/util"
 	"github.com/iantal/ld/protos/ld"
+	"github.com/sirupsen/logrus"
 )
 
 type Breakdown struct {
-	log      hclog.Logger
+	log      *util.StandardLogger
 	basePath string
 	rmHost   string
 	store    files.Storage
 }
 
-func NewBreakdown(l hclog.Logger, basePath, rmHost string, store files.Storage) *Breakdown {
+func NewBreakdown(l *util.StandardLogger, basePath, rmHost string, store files.Storage) *Breakdown {
 	return &Breakdown{l, basePath, rmHost, store}
 }
 
@@ -33,7 +34,11 @@ func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, erro
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		err := b.downloadRepository(projectID, commit)
 		if err != nil {
-			b.log.Error("Could not download bundled repository", "projectID", projectID, "commit", commit, "err", err)
+			b.log.WithFields(logrus.Fields{
+				"projectID": projectID,
+				"commit":    commit,
+				"error":     err,
+			}).Error("Could not download bundled repository")
 			return []*ld.Language{}, fmt.Errorf("Could not download bundled repository for %s", projectID)
 		}
 	}
@@ -45,12 +50,16 @@ func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, erro
 	if _, err := os.Stat(destPath); os.IsNotExist(err) {
 		err := b.store.Unbundle(srcPath, destPath)
 		if err != nil {
-			b.log.Error("Could not unbundle repository", "projectID", projectID, "commit", commit, "err", err)
+			b.log.WithFields(logrus.Fields{
+				"projectID": projectID,
+				"commit":    commit,
+				"error":     err,
+			}).Error("Could not unbundle repository")
 			return []*ld.Language{}, fmt.Errorf("Could not unbundle repository for %s", projectID)
 		}
 	}
 
-	return b.executeLinguist(filepath.Join(destPath, projectID)), nil
+	return b.executeLinguist(projectID, commit, filepath.Join(destPath, projectID)), nil
 }
 
 func (b *Breakdown) downloadRepository(projectID, commit string) error {
@@ -63,37 +72,51 @@ func (b *Breakdown) downloadRepository(projectID, commit string) error {
 		return fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
 	}
 
-	b.log.Info("Content-Dispozition", "file", resp.Header.Get("Content-Disposition"))
+	b.log.WithField("file", resp.Header.Get("Content-Disposition")).Info("Content-Dispozition")
 
-	b.save(projectID, resp.Body)
+	b.save(projectID, commit, resp.Body)
 	resp.Body.Close()
 
 	return nil
 }
 
-func (b *Breakdown) save(projectID string, r io.ReadCloser) error {
-	b.log.Info("Save project - storage", "projectID", projectID)
+func (b *Breakdown) save(projectID, commit string, r io.ReadCloser) {
+	b.log.WithFields(logrus.Fields{
+		"projectID": projectID,
+		"commit":    commit,
+	}).Info("Save project to storage")
 
 	bp := projectID + ".bundle"
 	fp := filepath.Join(projectID, "bundle", bp)
 	err := b.store.Save(fp, r)
 
 	if err != nil {
-		b.log.Error("Unable to save file", "error", err)
-		return fmt.Errorf("Unable to save file %s", err)
+		b.log.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"commit":    commit,
+			"error":     err,
+		}).Error("Unable to save file")
+		return
 	}
-
-	return nil
 }
 
-func (b *Breakdown) executeLinguist(repo string) []*ld.Language {
-	b.log.Info("Executing linguist for project", "project", repo)
+func (b *Breakdown) executeLinguist(projectID, commit, repo string) []*ld.Language {
+	b.log.WithFields(logrus.Fields{
+		"projectID": projectID,
+		"commit":    commit,
+		"path":      repo,
+	}).Info("Executing linguist")
 	cmd := exec.Command("github-linguist", repo, "--json")
 	cmdOutput := &bytes.Buffer{}
 	cmd.Stdout = cmdOutput
 	err := cmd.Run()
+
 	if err != nil {
-		os.Stderr.WriteString(err.Error())
+		b.log.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"commit":    commit,
+			"error":     err,
+		}).Error("Error executing linguist")
 	}
 	output := string(cmdOutput.Bytes())
 
@@ -114,5 +137,13 @@ func (b *Breakdown) executeLinguist(repo string) []*ld.Language {
 		languages = append(languages, language)
 	}
 
+	for _, l := range languages {
+		b.log.WithFields(logrus.Fields{
+			"projectID":   projectID,
+			"commit":      commit,
+			"language":    l.Name,
+			"total_files": len(l.Files),
+		}).Info("Linguist result")
+	}
 	return languages
 }
