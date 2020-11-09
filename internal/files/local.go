@@ -1,6 +1,7 @@
 package files
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -98,7 +99,9 @@ func (l *Local) Unbundle(src, dest string) error {
 	}
 
 	os.Chdir(dest)
-
+	fmt.Printf("Source: %s\n", src)
+	fmt.Printf("Destination: %s\n", dest)
+	
 	cmd := exec.Command("git", "clone", src)
 	if err := cmd.Run(); err != nil {
 		return xerrors.Errorf("Unable to unbundle repository: %w", err)
