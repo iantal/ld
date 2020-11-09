@@ -28,8 +28,7 @@ func NewBreakdown(l *util.StandardLogger, basePath, rmHost string, store files.S
 }
 
 func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, error) {
-
-	projectPath := filepath.Join(b.store.FullPath(projectID), "bundle")
+	projectPath := filepath.Join(b.store.FullPath(projectID), commit, "bundle")
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		err := b.downloadRepository(projectID, commit)
@@ -43,9 +42,9 @@ func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, erro
 		}
 	}
 
-	bp := projectID + ".bundle"
-	srcPath := b.store.FullPath(filepath.Join(projectID, "bundle", bp))
-	destPath := b.store.FullPath(filepath.Join(projectID, "unbundle"))
+	bp := commit + ".bundle"
+	srcPath := b.store.FullPath(filepath.Join(projectID, commit, "bundle", bp))
+	destPath := b.store.FullPath(filepath.Join(projectID, commit, "unbundle"))
 
 	if _, err := os.Stat(destPath); os.IsNotExist(err) {
 		err := b.store.Unbundle(srcPath, destPath)
@@ -59,7 +58,7 @@ func (b *Breakdown) GetLanguages(projectID, commit string) ([]*ld.Language, erro
 		}
 	}
 
-	return b.executeLinguist(projectID, commit, filepath.Join(destPath, projectID)), nil
+	return b.executeLinguist(projectID, commit, filepath.Join(destPath, commit)), nil
 }
 
 func (b *Breakdown) downloadRepository(projectID, commit string) error {
@@ -86,8 +85,8 @@ func (b *Breakdown) save(projectID, commit string, r io.ReadCloser) {
 		"commit":    commit,
 	}).Info("Save project to storage")
 
-	bp := projectID + ".bundle"
-	fp := filepath.Join(projectID, "bundle", bp)
+	bp := commit + ".bundle"
+	fp := filepath.Join(projectID, commit, "bundle", bp)
 	err := b.store.Save(fp, r)
 
 	if err != nil {
