@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ld-deployment
+  labels:
+    app: ld
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ld
+  template:
+    metadata:
+      labels:
+        app: ld
+    spec:
+      imagePullSecrets:
+        - name: dockerregistrykey
+      containers:
+        - name: ld
+          image: micky0000/seclens:v1.0.1-ld
+          imagePullPolicy: "Always"
+          ports:
+            - containerPort: 8003
+          env:
+            - name: RM_HOST
+              value: "rm-service:8005"
