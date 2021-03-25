@@ -1,5 +1,8 @@
 # LD - Language Detector
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+
 This tool is using [github-linguist](https://github.com/github/linguist) under the hood. It provides information about the languages used withing a project.
 
 The result is returned in the following format:
