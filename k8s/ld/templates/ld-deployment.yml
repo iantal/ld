@@ -18,7 +18,7 @@ spec:
         - name: dockerregistrykey
       containers:
         - name: ld
-          image: micky0000/seclens:v1.0.1-ld
+          image: {{ .Values.registry }}:{{ .Values.tag }}
           imagePullPolicy: "Always"
           ports:
             - containerPort: 8003
